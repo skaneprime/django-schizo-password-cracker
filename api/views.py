@@ -31,6 +31,39 @@ class HashRequestViewSet(viewsets.ModelViewSet):
         ratelimit_req_per_user = int(RATELIMIT_REQ_PER_USER_ENV)
         user_requests_count = self.queryset.filter(user=request.user).count()
 
+        if user_requests_count >= ratelimit_req_per_user:
+            return Response({
+                'error': 'ratelimited',
+                'message': 'Max request per user is: ' + str(ratelimit_req_per_user)
+            }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            hash_value = serializer.validated_data['hash_value']
+            # Check if the hash could potentially be from a limited character set
+            if not HashRequest._hash_is_from_limited_alphabet(hash_value):
+                return Response({"error": "Hash does not match the limited alphabet criteria."}, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    queryset = HashRequest.objects.all()
+    serializer_class = HashRequestSerializer
+    authentication_classes = [BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        RATELIMIT_REQ_PER_USER_ENV = getenv("RATELIMIT_REQ_PER_USER")
+        
+        if RATELIMIT_REQ_PER_USER_ENV is None:
+            return Response({
+                'error': 'missing env',
+                'message': 'RATELIMIT_REQ_PER_USER is not defined in .env'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        ratelimit_req_per_user = int(RATELIMIT_REQ_PER_USER_ENV)
+        user_requests_count = self.queryset.filter(user=request.user).count()
+
         if user_requests_count > ratelimit_req_per_user:
             return Response({
                 'error': 'ratelimited',

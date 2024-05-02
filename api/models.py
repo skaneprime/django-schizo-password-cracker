@@ -11,7 +11,7 @@ class HashRequest(models.Model):
     @staticmethod
     def _hash_is_from_limited_alphabet(hash_value):
         # Allowed characters and maximum password length
-        characters = 'abcde'
+        characters = 'abcdefghijklmnopqrstuvwxyz'
         max_length = 5
         # Generate all possible passwords and their MD5 hashes
         for length in range(1, max_length + 1):
